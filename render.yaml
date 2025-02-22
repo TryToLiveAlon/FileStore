@@ -2,21 +2,10 @@
 
 services:
   - type: web
-    name: FileStore-App  # Aap apni app ka naam yahan change kar sakte hain
+    name: FileStore-App  
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app  # Assuming app.py is your main Flask app file
+    startCommand: gunicorn app:app  
     envVars:
       - key: PYTHON_VERSION
-        value: 3.9  # Ya aap jo Python version use kar rahe hain woh daalein
-      # Agar aapko koi aur environment variables chahiye toh yahan add karein
-      # Example for SECRET_KEY (security ke liye important)
-      # - key: SECRET_KEY
-      #   generateValue: true # Render automatically generate karega
-      #   type: secret
-
-
-# Agar aapko database chahiye (jaise PostgreSQL) toh yahan add karein:
-# databases:
-#   - name: filestore_db
-#     plan: free # Ya koi aur plan jo aapko chahiye
+        value: 3.9  
