@@ -113,56 +113,48 @@ async def handle_join_request(client, chat_join_request):
 # Add channel
 @Bot.on_message(filters.command('addchnl') & filters.private & admin)
 async def add_force_sub(client: Client, message: Message):
-    temp = await message.reply("<b><i>ᴡᴀɪᴛ ᴀ sᴇᴄ..</i></b>", quote=True)
+    temp = await message.reply("Wait a sec...", quote=True)
     args = message.text.split(maxsplit=1)
 
     if len(args) != 2:
         return await temp.edit(
-            "<b>Usage:</b> <code>/addchnl -100XXXXXXXXXX</code>\n<b>Add only one channel at a time.</b>",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Close ✖️", callback_data="close")]])
+            "Usage:\n<code>/addchnl -100xxxxxxxxxx</code>"
         )
 
     try:
-        channel_id = int(args[1])
+        chat_id = int(args[1])
     except ValueError:
-        return await temp.edit("<b>❌ Invalid Channel ID!</b>")
+        return await temp.edit("❌ Invalid chat ID!")
 
-    all_channels = await db.show_channels()
-    channel_ids_only = [cid if isinstance(cid, int) else cid[0] for cid in all_channels]
-    if channel_id in channel_ids_only:
-        return await temp.edit(f"<b>Channel already exists:</b> <code>{channel_id}</code>")
+    all_chats = await db.show_channels()
+    if chat_id in [c if isinstance(c, int) else c[0] for c in all_chats]:
+        return await temp.edit(f"Already exists:\n<code>{chat_id}</code>")
 
     try:
-        chat = await client.get_chat(channel_id)
+        chat = await client.get_chat(chat_id)
+        if chat.type not in [ChatType.CHANNEL, ChatType.SUPERGROUP]:
+            return await temp.edit("❌ Only channels/supergroups allowed.")
 
-        if chat.type != ChatType.CHANNEL:
-            return await temp.edit("<b>❌ Only public or private channels are allowed.</b>")
+        bot_member = await client.get_chat_member(chat.id, "me")
+        if bot_member.status not in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]:
+            return await temp.edit("❌ Bot must be admin in that chat.")
 
-        member = await client.get_chat_member(chat.id, "me")
-        print(f"Bot status: {member.status} in chat: {chat.title} ({chat.id})")  # Debug
-
-        # FIXED ENUM COMPARISON
-        if member.status not in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]:
-            return await temp.edit("<b>❌ Bot must be an admin in that channel.</b>")
-
-        # Get invite link
+        # Try to get invite link
         try:
             link = await client.export_chat_invite_link(chat.id)
         except Exception:
             link = f"https://t.me/{chat.username}" if chat.username else f"https://t.me/c/{str(chat.id)[4:]}"
 
-        await db.add_channel(channel_id)
+        await db.add_channel(chat_id)
         return await temp.edit(
-            f"<b>✅ Force-sub channel added successfully!</b>\n\n"
+            f"✅ Added Successfully!\n\n"
             f"<b>Name:</b> <a href='{link}'>{chat.title}</a>\n"
-            f"<b>ID:</b> <code>{channel_id}</code>",
+            f"<b>ID:</b> <code>{chat_id}</code>",
             disable_web_page_preview=True
         )
 
     except Exception as e:
-        return await temp.edit(
-            f"<b>❌ Failed to add channel:</b>\n<code>{channel_id}</code>\n\n<i>{e}</i>"
-        )
+        return await temp.edit(f"❌ Failed to add chat:\n<code>{chat_id}</code>\n\n<i>{e}</i>")
 
 
 # Don't Remove Credit @CodeFlix_Bots, @rohit_1888
@@ -224,6 +216,74 @@ async def list_force_sub_channels(client: Client, message: Message):
             result += f"<b>•</b> <code>{ch_id}</code> — <i>Unavailable</i>\n"
 
     await temp.edit(result, disable_web_page_preview=True, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Close ✖️", callback_data="close")]]))
+
+# Don't Remove Credit @CodeFlix_Bots, @rohit_1888
+# Ask Doubt on telegram @CodeflixSupport
+#
+# Copyright (C) 2025 by Codeflix-Bots@Github, < https://github.com/Codeflix-Bots >.
+#
+# This file is part of < https://github.com/Codeflix-Bots/FileStore > project,
+# and is released under the MIT License.
+# Please see < https://github.com/Codeflix-Bots/FileStore/blob/master/LICENSE >
+#
+# All rights reserved.
+#
+
+@Bot.on_message(filters.command('delreq') & filters.private & admin)
+async def delete_requested_users(client, message: Message):
+    if len(message.command) < 2:
+        return await message.reply("⚠️ Usᴀɢᴇ: `/delreq <channel_id>`", quote=True)
+
+    try:
+        channel_id = int(message.command[1])
+    except ValueError:
+        return await message.reply("❌ Iɴᴠᴀʟɪᴅ ᴄʜᴀɴɴᴇʟ ID.", quote=True)
+
+    # Get channel request data
+    channel_data = await db.rqst_fsub_Channel_data.find_one({'_id': channel_id})
+    if not channel_data:
+        return await message.reply("ℹ️ Nᴏ ʀᴇǫᴜᴇsᴛ ᴄʜᴀɴɴᴇʟ ғᴏᴜɴᴅ ғᴏʀ ᴛʜɪs ᴄʜᴀɴɴᴇʟ.", quote=True)
+
+    user_ids = channel_data.get("user_ids", [])
+    if not user_ids:
+        return await message.reply("✅ Nᴏ ᴜsᴇʀs ᴛᴏ ᴘʀᴏᴄᴇss.", quote=True)
+
+    removed = 0
+    skipped = 0
+    left_users = 0
+
+    for user_id in user_ids:
+        try:
+            member = await client.get_chat_member(channel_id, user_id)
+            if member.status in (
+                ChatMemberStatus.MEMBER,
+                ChatMemberStatus.ADMINISTRATOR,
+                ChatMemberStatus.OWNER
+            ):
+                skipped += 1  # Still a participant, and in req list
+                continue
+            else:
+                await db.del_req_user(channel_id, user_id)
+                left_users += 1
+        except UserNotParticipant:
+            await db.del_req_user(channel_id, user_id)
+            left_users += 1
+        except Exception as e:
+            print(f"[!] Error checking user {user_id}: {e}")
+            skipped += 1
+
+    for user_id in user_ids:
+        if not await db.req_user_exist(channel_id, user_id):
+            await db.del_req_user(channel_id, user_id)
+            removed += 1
+
+    return await message.reply(
+        f"✅ Cʟᴇᴀɴᴜᴘ ᴄᴏᴍᴘʟᴇᴛᴇᴅ ғᴏʀ ᴄʜᴀɴɴᴇʟ `{channel_id}`\n\n"
+        f"👤 Rᴇᴍᴏᴠᴇᴅ ᴜsᴇʀs ɴᴏᴛ ɪɴ ᴄʜᴀɴɴᴇʟ: `{left_users}`\n"
+        f"🗑️ Rᴇᴍᴏᴠᴇᴅ ʟᴇғᴛᴏᴠᴇʀ ɴᴏɴ-ʀᴇǫᴜᴇsᴛ ᴜsᴇʀs: `{removed}`\n"
+        f"✅ Sᴛɪʟʟ ᴍᴇᴍʙᴇʀs: `{skipped}`",
+        quote=True
+    )
 
 # Don't Remove Credit @CodeFlix_Bots, @rohit_1888
 # Ask Doubt on telegram @CodeflixSupport
