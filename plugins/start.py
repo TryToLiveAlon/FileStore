@@ -258,20 +258,36 @@ async def retry_fsub(client: Client, query: CallbackQuery):
     user_id = query.from_user.id
     payload = query.data.split(":", 1)[1]
 
+    # Check if the user is still not subscribed
     if not await is_subscribed(client, user_id):
         await query.answer("❌ You still haven't joined all required channels!", show_alert=True)
         return await not_joined(client, query.message)
 
-    try:
-        fake_message = query.message
-        fake_message.text = f"/start {payload}"
-        fake_message.command = ["/start", payload]
+    # ✅ User is now verified — show the Get Content button immediately
+    await query.answer("✅ Verification successful!", show_alert=False)
 
-        await start_command(client, fake_message)
-        await query.message.delete()
-    except Exception as e:
-        print(f"Retry FSUB error: {e}")
-        await query.answer("⚠️ Something went wrong while fetching the file.", show_alert=True)
+    content_link = f"https://t.me/{client.username}?start={payload}"  # Auto redirect link to content
+
+    # Edit the same message (the join message) and show the Get Content button
+    new_buttons = InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("➡️ Get Your Content", url=content_link)],
+            [InlineKeyboardButton("🔒 Valid for 12 Hours", callback_data="noop")]
+        ]
+    )
+
+    try:
+        # If it's a photo message, edit the caption
+        await query.message.edit_caption(
+            caption="✅ **Verification Successful!**\n\nClick the button below to access your content 👇",
+            reply_markup=new_buttons
+        )
+    except Exception:
+        # If it's a text message, edit the text instead
+        await query.message.edit_text(
+            text="✅ **Verification Successful!**\n\nClick the button below to access your content 👇",
+            reply_markup=new_buttons
+        )
 
 
 # ================================================================================================= #
