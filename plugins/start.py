@@ -79,42 +79,43 @@ async def start_command(client: Client, message: Message):
             if verify_status['is_verified'] and VERIFY_EXPIRE < (time.time() - verify_status['verified_time']):
                 await db.update_verify_status(user_id, is_verified=False)
 
-            # If message contains verify_ token param
             if "verify_" in message.text:
-                _, token = message.text.split("_", 1)
-                if verify_status['verify_token'] != token:
-                    return await message.reply("⚠️ 𝖨𝗇𝗏𝖺𝗅𝗂𝖽 𝗍𝗈𝗄𝖾𝗇. 𝖯𝗅𝖾𝖺𝗌𝖾 /start 𝖺𝗀𝖺𝗂𝗇.")
+    _, token = message.text.split("_", 1)
+    if verify_status['verify_token'] != token:
+        return await message.reply("⚠️ Invalid token. Please /start again.")
 
-                await db.update_verify_status(id, is_verified=True, verified_time=time.time())
-                current = await db.get_verify_count(id)
-                await db.set_verify_count(id, current + 1)
+    # ✅ Update verification details
+    await db.update_verify_status(id, is_verified=True, verified_time=time.time())
+    current = await db.get_verify_count(id)
+    await db.set_verify_count(id, current + 1)
 
-                # -----------------------------
-                # NEW: Send "Get File" button so user can get file without reopening start link
-                # We will pass the original start param (message.command[1]) to callback_data if present
-                # -----------------------------
-                file_param = ""
-                try:
-                    if message.command and len(message.command) > 1:
-                        file_param = message.command[1]
-                except Exception:
-                    file_param = ""
+    # ✅ Show "Get Your Content" button right after verification
+    file_param = ""
+    try:
+        if message.command and len(message.command) > 1:
+            file_param = message.command[1]
+    except Exception:
+        file_param = ""
 
-                # Safety: callback_data has size limits; if file_param empty, user will be told to use start link again
-                if file_param:
-                    btn = InlineKeyboardMarkup(
-                        [[InlineKeyboardButton("📂 Get File", callback_data=f"getfile_{file_param}")]]
-                    )
-                    return await message.reply(
-                        f"✅ 𝗧𝗼𝗸𝗲𝗻 𝘃𝗲𝗿𝗶𝗳𝗶𝗲𝗱! Vᴀʟɪᴅ ғᴏʀ {get_exp_time(VERIFY_EXPIRE)}\n\n👉 अब नीचे दिए गए बटन से फाइल ले सकते हो।",
-                        reply_markup=btn
-                    )
-                else:
-                    # fallback: no param available, just send verified message
-                    return await message.reply(
-                        f"✅ 𝗧𝗼𝗸𝗲𝗻 𝘃𝗲𝗿𝗶𝗳𝗶𝗲𝗱! Vᴀʟɪᴅ ғᴏʀ {get_exp_time(VERIFY_EXPIRE)}"
-                    )
+    if file_param:
+        btn = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("📂 Get Your Content",
+                                   url=f"https://t.me/{client.username}?start={file_param}")]]
+        )
+        return await message.reply(
+            f"✅ Token verified successfully!\n\n"
+            f"Your verification is valid for {get_exp_time(VERIFY_EXPIRE)}.\n\n"
+            f"Click the button below to get your content 👇",
+            reply_markup=btn,
+        )
+    else:
+        return await message.reply(
+            f"✅ Token verified successfully!\n\n"
+            f"Your verification is valid for {get_exp_time(VERIFY_EXPIRE)}."
+        )
 
+
+            
             # If not verified and not premium -> create token & shortlink
             if not verify_status['is_verified'] and not is_premium:
                 token = ''.join(random.choices(rohit.ascii_letters + rohit.digits, k=10))
