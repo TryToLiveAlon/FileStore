@@ -80,39 +80,47 @@ async def start_command(client: Client, message: Message):
             await db.update_verify_status(user_id, is_verified=False)
 
         if "verify_" in message.text:
-            _, token = message.text.split("_", 1)
-            
-            if verify_status['verify_token'] != token:
-                return await message.reply("⚠️ Invalid token. Please /start again.")
+    _, token = message.text.split("_", 1)
+    verify_status = await db.get_verify_status(id)
 
-            # ✅ Update verification details
-            await db.update_verify_status(id, is_verified=True, verified_time=time.time())
-            current = await db.get_verify_count(id)
-            await db.set_verify_count(id, current + 1)
+    if verify_status['verify_token'] != token:
+        return await message.reply("⚠️ Invalid token. Please /start again.")
 
-            # ✅ Show "Get Your Content" button right after verification
-            file_param = ""
-            try:
-                if message.command and len(message.command) > 1:
-                    file_param = message.command[1]
-            except Exception:
-                file_param = ""
+    # ✅ Update verification details
+    await db.update_verify_status(id, is_verified=True, verified_time=time.time())
+    current = await db.get_verify_count(id)
+    await db.set_verify_count(id, current + 1)
 
-            if file_param:
-                btn = InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("📂 Get Your Content", url=f"https://t.me/{client.username}?start={file_param}")]]
-                )
-                return await message.reply(
-                    f"✅ Token verified successfully!\n\nYour verification is valid for {get_exp_time(VERIFY_EXPIRE)}.\n\n"
-                    f"Click the button below to get your content 👇",
-                    reply_markup=btn
-                )
-            else:
-                return await message.reply(
-                    f"✅ Token verified successfully!\n\nYour verification is valid for {get_exp_time(VERIFY_EXPIRE)}."
-                )
-    
-    
+    # ✅ NEW: Direct "Get File" button without re-clicking start
+    file_param = ""
+    try:
+        if message.command and len(message.command) > 1:
+            file_param = message.command[1]
+    except Exception:
+        file_param = ""
+
+    if file_param:
+        btn = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("📂 Get Your Content", callback_data=f"getfile_{file_param}")]]
+        )
+        return await message.reply(
+            f"✅ Token verified successfully!\n\nYour verification is valid for {get_exp_time(VERIFY_EXPIRE)}.\n\n"
+            f"Click below to get your content 👇",
+            reply_markup=btn
+        )
+    else:
+        return await message.reply(
+            f"✅ Token verified successfully!\n\nYour verification is valid for {get_exp_time(VERIFY_EXPIRE)}."
+        )
+
+        @Bot.on_callback_query(filters.regex(r"getfile_(.+)"))
+async def get_file_callback(client, callback_query):
+    param = callback_query.data.split("_", 1)[1]
+    await callback_query.answer("📂 Fetching your file...", show_alert=False)
+    await client.send_message(
+        callback_query.from_user.id,
+        f"/start {param}"
+    )
 
 
             
