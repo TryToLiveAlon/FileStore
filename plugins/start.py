@@ -113,18 +113,16 @@ if len(text) > 7:
         return await message.reply(
             f"✅ Token verified successfully!\n\nYour verification is valid for {get_exp_time(VERIFY_EXPIRE)}."
         )
-
+        
 @Bot.on_callback_query(filters.regex(r"getfile_(.+)"))
 async def get_file_callback(client, callback_query):
     param = callback_query.data.split("_", 1)[1]
     await callback_query.answer("📂 Fetching your file...", show_alert=False)
     await client.send_message(
-        callback_query.from_user.id,
-        f"/start {param}"
+        chat_id=callback_query.from_user.id,
+        text=f"/start {param}"
     )
 
-
-            
             # If not verified and not premium -> create token & shortlink
             if not verify_status['is_verified'] and not is_premium:
                 token = ''.join(random.choices(rohit.ascii_letters + rohit.digits, k=10))
